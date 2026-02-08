@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>CDMX vs Shanghai - Radiografía Económica</title>
+    <!-- 引入 React, ReactDOM, Babel -->
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <!-- 引入 Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- 引入 Phosphor Icons -->
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+    
+    <style>
+        body { 
+            font-family: 'Inter', sans-serif; 
+            background: linear-gradient(180deg, #FFF8F1 0%, #FFFDF5 100%); 
+            color: #334155;
+            min-height: 100vh;
+        }
+        h1, h2, h3, button, .display-font { font-family: 'Space Grotesk', sans-serif; }
+        
+        .btn-gradient {
+            background: linear-gradient(135deg, #FF9A9E 0%, #FECFEF 99%, #FECFEF 100%); /* 更柔和的蜜桃色 */
+            background: linear-gradient(90deg, #F97316 0%, #DB2777 100%); /* 保持高对比度以符合上一版 */
+        }
+
+        .card-shadow {
+            box-shadow: 0 10px 40px -10px rgba(0,0,0,0.08);
+        }
+
+        /* 动画 */
+        @keyframes fade-in-up {
+            from { opacity: 0; transform: translateY(15px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .animate-fade-in-up {
+            animation: fade-in-up 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+
+        .hide-scrollbar::-webkit-scrollbar { display: none; }
+        
+        .tag-pill {
+            background-color: #FFF7ED;
+            color: #C2410C;
+            border: 1px solid #FFEDD5;
+            transition: all 0.2s;
+        }
+        .tag-pill:hover {
+            background-color: #FFEDD5;
+            transform: translateY(-1px);
+        }
+    </style>
+</head>
+<body class="antialiased selection:bg-orange-100 selection:text-orange-900">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+
+        // --- 1. 经济基准 ---
+        const RATES = {
+            CNY_TO_USD: 0.139,
+            MXN_TO_USD: 0.059
+        };
+
+        // --- 2. 替代货币 (机会成本基准) ---
+        // 我们用当地最具代表性的"硬通货"来衡量价值
+        const BENCHMARKS = {
+            MX: {
+                taco: { price: 25, name: "Tacos", icon: "🌮" }, // 街头Taco价格
+                metro: { price: 5, name: "Viajes Metro", icon: "🚇" } // CDMX地铁票 (极度便宜，政府补贴)
+            },
+            SH: {
+                dumpling: { price: 4, name: "Shengjian", icon: "🥟" }, // 单只生煎价格
+                metro: { price: 4, name: "Viajes Metro", icon: "🚇" } // 上海地铁起步价
+            }
+        };
+
+        // --- 3. 数据库: 客观经济结构分析 ---
+        const MOCK_DB = [
+            {
+                keywords: ["computer", "computadora", "laptop", "macbook", "pc"],
+                category: "Tecnología",
+                icon: "ph-laptop",
+                mx: { name: "MacBook Air M2", price_local: 24999, currency: "MXN" }, 
+                sh: { name: "MacBook Air M2", price_local: 8999, currency: "CNY" },
+                analysis: {
+                    title: "Efecto de la Cadena de Suministro", // 供应链效应
+                    text: "No es una cuestión de riqueza, sino de logística. Shanghai se beneficia de la proximidad inmediata a los centros de manufactura (Suzhou/Shenzhen), eliminando costos de importación y envío. México, aunque es una potencia manufacturera, aplica aranceles a la tecnología de consumo final, lo que eleva el precio retail. El consumidor mexicano paga un 'premium' por la importación, mientras que el chino paga precio de fábrica.",
+                    opportunity_unit: "taco" // 用Taco来衡量这个价格能吃多少
+                }
+            },
+            {
+                keywords: ["iphone", "celular", "smartphone", "apple"],
+                category: "Tecnología",
+                icon: "ph-device-mobile",
+                mx: { name: "iPhone 15 (128GB)", price_local: 19499, currency: "MXN" },
+                sh: { name: "iPhone 15 (128GB)", price_local: 5999, currency: "CNY" },
+                analysis: {
+                    title: "Paridad de Marca Global", // 全球品牌平价
+                    text: "Los bienes de lujo globales (como Apple) mantienen precios estandarizados en USD, pero los impuestos locales distorsionan el costo final. CDMX tiene una carga impositiva al consumo (IVA + IEPS en algunos casos) que se siente más fuerte. En Shanghai, el volumen masivo de ventas permite márgenes más ajustados para los distribuidores.",
+                    opportunity_unit: "taco"
+                }
+            },
+            {
+                keywords: ["taco", "tacos", "pastor", "comida", "lunch"],
+                category: "Gastronomía",
+                icon: "ph-hamburger",
+                mx: { name: "Orden de Tacos (5)", price_local: 75, currency: "MXN" }, 
+                sh: { name: "Guotie/Dumplings (5)", price_local: 22, currency: "CNY" }, 
+                analysis: {
+                    title: "Eficiencia del Mercado Callejero", // 街头市场效率
+                    text: "Ambas ciudades son capitales mundiales de la comida callejera. La estructura de costos es similar: ingredientes locales baratos y alta densidad de clientes. Sin embargo, la red de comida en CDMX es más descentralizada y orgánica, funcionando como un tejido social vital. En Shanghai, la regulación urbana está formalizando estos puestos, lo que podría elevar precios a futuro.",
+                    opportunity_unit: "metro" // 用地铁票衡量
+                }
+            },
+            {
+                keywords: ["metro", "subway", "transporte", "boleto"],
+                category: "Movilidad",
+                icon: "ph-train",
+                mx: { name: "Boleto de Metro", price_local: 5, currency: "MXN" },
+                sh: { name: "Boleto de Metro", price_local: 4, currency: "CNY" },
+                analysis: {
+                    title: "Política de Subsidios Públicos", // 公共补贴政策
+                    text: "Aquí CDMX muestra una política social agresiva. El boleto a $5 MXN es uno de los más baratos del mundo gracias a un subsidio gubernamental masivo para apoyar a la clase trabajadora. Shanghai opera un modelo más mixto, donde el precio sube por distancia para cubrir costos operativos. El 'derecho a la movilidad' es fiscalmente más protegido en México.",
+                    opportunity_unit: "taco"
+                }
+            },
+            {
+                keywords: ["renta", "rent", "alquiler", "depa", "vivienda"],
+                category: "Vivienda",
+                icon: "ph-house-line",
+                // Roma Norte vs Jing'an
+                mx: { name: "Renta 1 Recámara (Roma Norte)", price_local: 18000, currency: "MXN" },
+                sh: { name: "Renta 1 Recámara (Jing'an)", price_local: 9500, currency: "CNY" },
+                analysis: {
+                    title: "Presión Inmobiliaria Diferenciada", // 差异化房产压力
+                    text: "La Roma Norte enfrenta una 'inflación importada' por nómadas digitales con ingresos en dólares, desacoplando las rentas de los salarios locales. Jing'an, aunque cara, tiene precios dictados por la élite corporativa local y una oferta masiva de rascacielos que modera ligeramente la escasez. La densidad vertical de Shanghai amortigua precios que en la horizontalidad de la Roma se disparan.",
+                    opportunity_unit: "taco"
+                }
+            }
+        ];
+
+        function App() {
+            const [query, setQuery] = useState("");
+            const [loading, setLoading] = useState(false);
+            const [result, setResult] = useState(null);
+            const [loadingText, setLoadingText] = useState("Iniciando análisis económico...");
+            const inputRef = useRef(null);
+
+            useEffect(() => {
+                if (inputRef.current) inputRef.current.focus();
+            }, []);
+
+            useEffect(() => {
+                if (loading) {
+                    const texts = [
+                        "Consultando tipo de cambio real...",
+                        "Analizando impuestos locales...",
+                        "Comparando canasta básica...",
+                        "Evaluando costo de oportunidad..."
+                    ];
+                    let i = 0;
+                    const interval = setInterval(() => {
+                        setLoadingText(texts[i % texts.length]);
+                        i++;
+                    }, 800);
+                    return () => clearInterval(interval);
+                }
+            }, [loading]);
+
+            const toUSD = (price, currency) => {
+                if (currency === "CNY") return price * RATES.CNY_TO_USD;
+                if (currency === "MXN") return price * RATES.MXN_TO_USD;
+                return price;
+            };
+
+            const findMatch = (input) => {
+                const lowerInput = input.toLowerCase();
+                const match = MOCK_DB.find(item => item.keywords.some(k => lowerInput.includes(k)));
+                
+                if (match) {
+                    return {
+                        ...match,
+                        mx: { ...match.mx, price_usd: toUSD(match.mx.price_local, match.mx.currency) },
+                        sh: { ...match.sh, price_usd: toUSD(match.sh.price_local, match.sh.currency) }
+                    };
+                }
+                
+                // Fallback
+                const randomBase = input.length * 20;
+                const estimatedPriceMXN = 300 + randomBase;
+                const estimatedPriceCNY = 100 + randomBase;
+                
+                return {
+                    category: "General",
+                    icon: "ph-tag",
+                    mx: { name: input, price_local: estimatedPriceMXN, currency: "MXN", price_usd: toUSD(estimatedPriceMXN, "MXN") },
+                    sh: { name: input, price_local: estimatedPriceCNY, currency: "CNY", price_usd: toUSD(estimatedPriceCNY, "CNY") },
+                    analysis: {
+                        title: "Análisis de Mercado General",
+                        text: "Para bienes de consumo general, las diferencias suelen radicar en los impuestos al consumo y los costos logísticos internos. Shanghai tiende a tener ventajas en manufactura, mientras CDMX destaca en servicios y alimentos frescos.",
+                        opportunity_unit: "taco"
+                    }
+                };
+            };
+
+            const handleSearch = (searchQuery = query) => {
+                if (!searchQuery) return;
+                setQuery(searchQuery);
+                setLoading(true);
+                setResult(null);
+                setTimeout(() => {
+                    setResult(findMatch(searchQuery));
+                    setLoading(false);
+                }, 1000); 
+            };
+
+            // 计算机会成本 (能买多少个单位)
+            const calcOpportunity = (priceLocal, unitType, region) => {
+                const unitPrice = BENCHMARKS[region][unitType].price;
+                return Math.round(priceLocal / unitPrice);
+            };
+
+            return (
+                <div className="flex flex-col items-center p-4 md:p-8 max-w-2xl mx-auto font-sans text-slate-700">
+                    
+                    {/* Header */}
+                    <div className="text-center mt-6 mb-8 animate-fade-in-up">
+                        <div className="flex justify-center items-center gap-2 mb-1">
+                            <h1 className="text-3xl font-black text-slate-800 tracking-tight">
+                                CDMX <span className="text-orange-500 mx-1">vs</span> Shanghai
+                            </h1>
+                        </div>
+                        <p className="text-slate-500 text-sm font-medium">
+                            Comparador de Poder Adquisitivo y Estructura Económica
+                        </p>
+                    </div>
+
+                    {/* Search */}
+                    <div className="w-full bg-white rounded-3xl p-2 shadow-lg border border-slate-100 flex flex-col md:flex-row gap-2 mb-8 relative z-10">
+                        <input 
+                            ref={inputRef}
+                            type="text" 
+                            placeholder="Ej: macbook, tacos, renta, metro..." 
+                            className="flex-1 p-4 rounded-2xl text-slate-700 placeholder-slate-400 outline-none text-lg bg-transparent"
+                            value={query}
+                            onChange={(e) => setQuery(e.target.value)}
+                            onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+                            autoComplete="off"
+                        />
+                        <button 
+                            onClick={() => handleSearch()}
+                            className="btn-gradient text-white px-8 py-3 rounded-xl font-bold text-lg shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2 active:scale-95"
+                        >
+                            <i className="ph-bold ph-scales"></i>
+                            Analizar
+                        </button>
+                    </div>
+
+                    {/* Loading */}
+                    {loading && (
+                        <div className="my-12 flex flex-col items-center space-y-4 animate-pulse">
+                            <div className="w-10 h-10 border-4 border-orange-400 border-t-transparent rounded-full animate-spin"></div>
+                            <p className="text-orange-600 font-medium text-xs tracking-wide uppercase">{loadingText}</p>
+                        </div>
+                    )}
+
+                    {/* Results */}
+                    {result && (
+                        <div className="w-full animate-fade-in-up space-y-6 pb-20">
+                            
+                            {/* 1. Price Comparison Card */}
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="bg-white p-6 rounded-2xl card-shadow border border-slate-50 flex flex-col items-center text-center relative overflow-hidden">
+                                    <div className="absolute top-0 w-full h-1.5 bg-orange-500"></div>
+                                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">México</span>
+                                    <h3 className="text-3xl font-black text-slate-800 mb-1 display-font">
+                                        ${result.mx.price_usd.toFixed(0)}
+                                    </h3>
+                                    <p className="text-xs text-slate-500 font-mono bg-slate-50 px-2 py-1 rounded mb-2">
+                                        {result.mx.price_local.toLocaleString()} {result.mx.currency}
+                                    </p>
+                                </div>
+
+                                <div className="bg-white p-6 rounded-2xl card-shadow border border-slate-50 flex flex-col items-center text-center relative overflow-hidden">
+                                    <div className="absolute top-0 w-full h-1.5 bg-teal-500"></div>
+                                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">Shanghai</span>
+                                    <h3 className="text-3xl font-black text-slate-800 mb-1 display-font">
+                                        ${result.sh.price_usd.toFixed(0)}
+                                    </h3>
+                                    <p className="text-xs text-slate-500 font-mono bg-slate-50 px-2 py-1 rounded mb-2">
+                                        {result.sh.price_local.toLocaleString()} {result.sh.currency}
+                                    </p>
+                                </div>
+                            </div>
+
+                            {/* 2. Opportunity Cost (The New Idea) */}
+                            <div className="bg-white rounded-2xl card-shadow border border-slate-50 p-6">
+                                <div className="flex items-center gap-2 mb-6">
+                                    <i className="ph-fill ph-coins text-yellow-500 text-xl"></i>
+                                    <h3 className="font-bold text-slate-800 text-lg">Costo de Oportunidad Real</h3>
+                                </div>
+                                <p className="text-xs text-slate-500 mb-4">
+                                    ¿A cuántas experiencias locales equivale este gasto? (Lo que podrías comprar con ese dinero)
+                                </p>
+
+                                <div className="space-y-6">
+                                    {/* MX Opportunity */}
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-8 h-8 rounded-full bg-orange-100 flex items-center justify-center text-orange-600 font-bold text-xs">MX</div>
+                                            <div>
+                                                <p className="text-xs font-bold text-slate-700">En CDMX equivale a:</p>
+                                                <p className="text-sm text-slate-500">
+                                                    {BENCHMARKS.MX[result.analysis.opportunity_unit].name}
+                                                </p>
+                                            </div>
+                                        </div>
+                                        <div className="text-right">
+                                            <span className="text-2xl font-black text-orange-500 display-font">
+                                                {calcOpportunity(result.mx.price_local, result.analysis.opportunity_unit, 'MX').toLocaleString()}
+                                            </span>
+                                            <span className="text-lg ml-1">{BENCHMARKS.MX[result.analysis.opportunity_unit].icon}</span>
+                                        </div>
+                                    </div>
+
+                                    {/* Divider */}
+                                    <div className="h-px bg-slate-100 w-full"></div>
+
+                                    {/* SH Opportunity */}
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-8 h-8 rounded-full bg-teal-100 flex items-center justify-center text-teal-600 font-bold text-xs">SH</div>
+                                            <div>
+                                                <p className="text-xs font-bold text-slate-700">En Shanghai equivale a:</p>
+                                                <p className="text-sm text-slate-500">
+                                                    {BENCHMARKS.SH[result.analysis.opportunity_unit === 'taco' ? 'dumpling' : result.analysis.opportunity_unit].name}
+                                                </p>
+                                            </div>
+                                        </div>
+                                        <div className="text-right">
+                                            <span className="text-2xl font-black text-teal-500 display-font">
+                                                {calcOpportunity(result.sh.price_local, result.analysis.opportunity_unit === 'taco' ? 'dumpling' : result.analysis.opportunity_unit, 'SH').toLocaleString()}
+                                            </span>
+                                            <span className="text-lg ml-1">{BENCHMARKS.SH[result.analysis.opportunity_unit === 'taco' ? 'dumpling' : result.analysis.opportunity_unit].icon}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <p className="text-[10px] text-slate-400 mt-4 italic text-center">
+                                    *Cálculo basado en precios promedio de productos básicos locales.
+                                </p>
+                            </div>
+
+                            {/* 3. Market Analysis (Professional & Objective) */}
+                            <div className="bg-slate-50 rounded-2xl border border-slate-100 p-6 md:p-8">
+                                <div className="flex items-center gap-3 mb-4">
+                                    <i className="ph-bold ph-chart-line-up text-slate-700 text-xl"></i>
+                                    <h3 className="text-lg font-bold text-slate-800">{result.analysis.title}</h3>
+                                </div>
+                                
+                                <p className="text-slate-600 leading-relaxed text-sm text-justify">
+                                    {result.analysis.text}
+                                </p>
+                            </div>
+
+                            {/* Share */}
+                            <div className="text-center pt-2">
+                                <button className="text-slate-400 hover:text-slate-800 transition-colors text-xs font-bold uppercase tracking-widest flex items-center justify-center gap-2 mx-auto">
+                                    <i className="ph-bold ph-share-network text-lg"></i>
+                                    Compartir Datos
+                                </button>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
